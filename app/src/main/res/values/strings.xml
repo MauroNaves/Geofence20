@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Geofence2.0</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Marcelo Machadão</string>
+    <string name="nav_header_subtitle">gabriel123@gmail.com</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">SAIR</string>
+
+</resources>
