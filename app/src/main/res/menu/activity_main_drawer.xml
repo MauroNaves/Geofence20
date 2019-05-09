@@ -5,25 +5,25 @@
 
     <group android:checkableBehavior="single">
         <item
-            android:id="@+id/nav_camera"
-            android:icon="@drawable/ic_menu_camera"
+            android:id="@+id/nav_home"
+            android:icon="@drawable/ic_location"
             android:title="Home" />
 
         <item
-            android:id="@+id/nav_manage"
-            android:icon="@drawable/ic_menu_manage"
+            android:id="@+id/nav_localiza"
+            android:icon="@drawable/ic_carro_marker"
             android:title="Localizar Carro" />
     </group>
 
     <item android:title="Definir cercas:">
         <menu>
             <item
-                android:id="@+id/nav_share"
-                android:icon="@drawable/ic_menu_share"
+                android:id="@+id/nav_casa"
+                android:icon="@drawable/ic_home_marker"
                 android:title="Casa" />
             <item
-                android:id="@+id/nav_send"
-                android:icon="@drawable/ic_menu_send"
+                android:id="@+id/nav_trabalho"
+                android:icon="@drawable/ic_trabalho_marker"
                 android:title="Trabalho" />
         </menu>
     </item>
