@@ -8,10 +8,6 @@
     android:fitsSystemWindows="true"
     tools:openDrawer="start">
 
-    <!--<include-->
-    <!--layout="@layout/app_bar_main"-->
-    <!--android:layout_width="match_parent"-->
-    <!--android:layout_height="match_parent" />-->
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -20,11 +16,12 @@
             android:id="@+id/barra"
             layout="@layout/app_bar_main" />
 
-        <FrameLayout
-            android:id="@+id/content_frame"
+        <fragment
+            android:id="@+id/mapa"
+            android:name="com.appolica.interactiveinfowindow.fragment.MapInfoWindowFragment"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_below="@+id/barra"/>
+            android:layout_below="@+id/barra" />
     </RelativeLayout>
 
     <android.support.design.widget.NavigationView
