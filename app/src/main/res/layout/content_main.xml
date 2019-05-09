@@ -16,6 +16,4 @@
         tools:context=".MapsActivity"
         android:name="com.google.android.gms.maps.SupportMapFragment" />
 
-
-
 </android.support.constraint.ConstraintLayout>
