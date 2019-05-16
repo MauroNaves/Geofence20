@@ -1,8 +1,18 @@
 package com.example.geofence20;
 
+import android.Manifest;
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.hardware.fingerprint.FingerprintManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.design.widget.NavigationView;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
@@ -10,8 +20,12 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 import com.appolica.interactiveinfowindow.fragment.MapInfoWindowFragment;
+import com.example.geofence20.fingerprint.FingerPrintAuthCallback;
+import com.example.geofence20.fingerprint.FingerPrintAuthHelper;
+import com.example.geofence20.fingerprint.FingerPrintUtils;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -22,14 +36,19 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-
 public class MainActivity extends AppCompatActivity
-		implements NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback {
+		implements NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback, LocationListener, FingerPrintAuthCallback {
+
+	private int LOCATION_PERMISSION_CODE = 1;
 
 	private LatLng carroLatLng;
 	private LatLng casaLatLng;
 	private LatLng trabalhoLatLng;
 	private GoogleMap map;
+	private LocationManager locationManager;
+	private static final float DEFAULT_ZOOM = 15f;
+	private LatLng myLocation = null;
+	private FingerPrintAuthHelper mFingerPrintAuthHelper;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -53,8 +72,64 @@ public class MainActivity extends AppCompatActivity
 
 		MapInfoWindowFragment mapInfoWindowFragment = (MapInfoWindowFragment) getSupportFragmentManager().findFragmentById(R.id.mapa);
 		mapInfoWindowFragment.getMapAsync(this);
+
+		locationManager = (LocationManager)
+				getSystemService(Context.LOCATION_SERVICE);
+		// Here, thisActivity is the current activity
+		if (ContextCompat.checkSelfPermission(
+				this,
+				Manifest.permission.ACCESS_FINE_LOCATION
+		)
+				!= PackageManager.PERMISSION_GRANTED) {
+
+			// Should we show an explanation?
+			if (ActivityCompat.shouldShowRequestPermissionRationale(
+					this,
+					Manifest.permission.ACCESS_FINE_LOCATION
+			)) {
+
+				// Show an expanation to the user *asynchronously* -- don't block
+				// this thread waiting for the user's response! After the user
+				// sees the explanation, try again to request the permission.
+
+			} else {
+
+				// No explanation needed, we can request the permission.
+
+				ActivityCompat.requestPermissions(
+						this,
+						new String[] {Manifest.permission.ACCESS_FINE_LOCATION},
+						LOCATION_PERMISSION_CODE
+				);
+
+				// MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
+				// app-defined int constant. The callback method gets the
+				// result of the request.
+			}
+		} else {
+			locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 10, this);
+		}
+
+		if (FingerPrintUtils.isSupportedHardware(getApplicationContext())) {
+			mFingerPrintAuthHelper = FingerPrintAuthHelper.getHelper(getApplicationContext(), this);
+		}
 	}
 
+	@Override
+	protected void onResume() {
+		super.onResume();
+		if (mFingerPrintAuthHelper != null) {
+			mFingerPrintAuthHelper.startAuth();
+		}
+	}
+
+	@Override
+	protected void onPause() {
+		super.onPause();
+		if (mFingerPrintAuthHelper != null) {
+			mFingerPrintAuthHelper.stopAuth();
+		}
+	}
 
 	@Override
 	public void onBackPressed() {
@@ -68,19 +143,14 @@ public class MainActivity extends AppCompatActivity
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
 		getMenuInflater().inflate(R.menu.main, menu);
 		return true;
 	}
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
-		// Handle action bar item clicks here. The action bar will
-		// automatically handle clicks on the Home/Up button, so long
-		// as you specify a parent activity in AndroidManifest.xml.
 		int id = item.getItemId();
 
-		//noinspection SimplifiableIfStatement
 		if (id == R.id.action_settings) {
 			finish();
 			return true;
@@ -89,28 +159,26 @@ public class MainActivity extends AppCompatActivity
 		return super.onOptionsItemSelected(item);
 	}
 
-	@SuppressWarnings ("StatementWithEmptyBody")
 	@Override
 	public boolean onNavigationItemSelected(MenuItem item) {
 		// Handle navigation view item clicks here.
 		int id = item.getItemId();
 
 		if (id == R.id.nav_home) {
-
+			if (myLocation!= null) {
+				map.animateCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM));
+			}
 		} else if (id == R.id.nav_localiza) {
-			map.animateCamera(CameraUpdateFactory.newLatLngZoom(carroLatLng, 15));
+			map.animateCamera(CameraUpdateFactory.newLatLngZoom(carroLatLng, DEFAULT_ZOOM));
 		} else if (id == R.id.nav_casa) {
-			map.animateCamera(CameraUpdateFactory.newLatLngZoom(casaLatLng, 15));
+			map.animateCamera(CameraUpdateFactory.newLatLngZoom(casaLatLng, DEFAULT_ZOOM));
 		} else if (id == R.id.nav_trabalho) {
-			map.animateCamera(CameraUpdateFactory.newLatLngZoom(trabalhoLatLng, 15));
+			map.animateCamera(CameraUpdateFactory.newLatLngZoom(trabalhoLatLng, DEFAULT_ZOOM));
 		}
-
-
 		DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
 		drawer.closeDrawer(GravityCompat.START);
 		return true;
 	}
-
 
 	@Override
 	public void onMapReady(GoogleMap googleMap) {
@@ -130,5 +198,75 @@ public class MainActivity extends AppCompatActivity
 		int padding = (int) (width * 0.10);
 		CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngBounds(builder.build(), width, height, padding);
 		map.animateCamera(cameraUpdate);
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+		if (requestCode == LOCATION_PERMISSION_CODE) {
+			if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+				locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 10, this);
+			}
+		}
+	}
+
+	@Override
+	public void onLocationChanged(Location location) {
+		myLocation = new LatLng(
+				location.getLatitude(),
+				location.getLongitude()
+		);
+		map.moveCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM));
+		if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+			return;
+		}
+		map.setMyLocationEnabled(true);
+	}
+
+	@Override
+	public void onStatusChanged(String s, int i, Bundle bundle) {
+
+	}
+
+	@Override
+	public void onProviderEnabled(String s) {
+
+	}
+
+	@Override
+	public void onProviderDisabled(String s) {
+
+	}
+
+	/*
+	* FINGERPRINT
+	* */
+	@Override
+	public void onNoFingerPrintHardwareFound() {
+
+	}
+
+	@Override
+	public void onNoFingerPrintRegistered() {
+
+	}
+
+	@Override
+	public void onBelowMarshmallow() {
+
+	}
+
+	@Override
+	public void onAuthSuccess(FingerprintManager.CryptoObject cryptoObject) {
+		Toast.makeText(this, "Digital", Toast.LENGTH_LONG).show();
+	}
+
+	@Override
+	public void onAuthFailed(int errorCode, String errorMessage) {
+
+	}
+
+	@Override
+	public void onFingerPrintHardwareFound() {
+
 	}
 }
