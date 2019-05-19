@@ -1,9 +1,11 @@
 package com.example.geofence20;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.hardware.fingerprint.FingerprintManager;
 import android.location.Location;
 import android.location.LocationListener;
@@ -26,49 +28,57 @@ import com.appolica.interactiveinfowindow.fragment.MapInfoWindowFragment;
 import com.example.geofence20.fingerprint.FingerPrintAuthCallback;
 import com.example.geofence20.fingerprint.FingerPrintAuthHelper;
 import com.example.geofence20.fingerprint.FingerPrintUtils;
-import com.google.android.gms.maps.CameraUpdate;
+import com.example.geofence20.model.MapMarker;
+import com.example.geofence20.model.MapMarkerFactory;
+import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofencingClient;
+import com.google.android.gms.location.GeofencingRequest;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.LatLngBounds;
-import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 
 public class MainActivity extends AppCompatActivity
 		implements NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback, LocationListener, FingerPrintAuthCallback {
 
 	private int LOCATION_PERMISSION_CODE = 1;
+	private static final int GEOFENCE_RADIUS = 100;
+	private static final int CODIGO_MARKER_CASA = 1;
+	private static final int CODIGO_MARKER_TRABALHO = 2;
+	private int codigoSelecionado = 0;
 
-	private LatLng carroLatLng;
-	private LatLng casaLatLng;
-	private LatLng trabalhoLatLng;
+//	private LatLng carroLatLng;
 	private GoogleMap map;
 	private LocationManager locationManager;
 	private static final float DEFAULT_ZOOM = 15f;
 	private LatLng myLocation = null;
 	private FingerPrintAuthHelper mFingerPrintAuthHelper;
+	private GeofencingClient mGeofencingClient;
+	private MapMarkerFactory factory;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
-		Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+		Toolbar toolbar = findViewById(R.id.toolbar);
 		setSupportActionBar(toolbar);
 
-		DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+		DrawerLayout drawer = findViewById(R.id.drawer_layout);
 		ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
 				this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
 		drawer.addDrawerListener(toggle);
 		toggle.syncState();
 
-		NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+		NavigationView navigationView = findViewById(R.id.nav_view);
 		navigationView.setNavigationItemSelectedListener(this);
 
-		carroLatLng = new LatLng(-16.678951, -49.244458);
-		casaLatLng = new LatLng(-16.681270, -49.258656);
-		trabalhoLatLng = new LatLng(-16.685723, -49.254700);
+		factory = new MapMarkerFactory();
+//		carroLatLng = new LatLng(-16.678951, -49.244458);
+//		casa = new Casa(new LatLng(-16.681270, -49.258656));
+//		trabalho = new Trabalho(new LatLng(-16.685723, -49.254700));
 
 		MapInfoWindowFragment mapInfoWindowFragment = (MapInfoWindowFragment) getSupportFragmentManager().findFragmentById(R.id.mapa);
 		mapInfoWindowFragment.getMapAsync(this);
@@ -113,6 +123,8 @@ public class MainActivity extends AppCompatActivity
 		if (FingerPrintUtils.isSupportedHardware(getApplicationContext())) {
 			mFingerPrintAuthHelper = FingerPrintAuthHelper.getHelper(getApplicationContext(), this);
 		}
+
+		mGeofencingClient = LocationServices.getGeofencingClient(this);
 	}
 
 	@Override
@@ -133,7 +145,7 @@ public class MainActivity extends AppCompatActivity
 
 	@Override
 	public void onBackPressed() {
-		DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+		DrawerLayout drawer = findViewById(R.id.drawer_layout);
 		if (drawer.isDrawerOpen(GravityCompat.START)) {
 			drawer.closeDrawer(GravityCompat.START);
 		} else {
@@ -165,17 +177,25 @@ public class MainActivity extends AppCompatActivity
 		int id = item.getItemId();
 
 		if (id == R.id.nav_home) {
-			if (myLocation!= null) {
+			if (myLocation != null) {
 				map.animateCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM));
 			}
 		} else if (id == R.id.nav_localiza) {
-			map.animateCamera(CameraUpdateFactory.newLatLngZoom(carroLatLng, DEFAULT_ZOOM));
+//			map.animateCamera(CameraUpdateFactory.newLatLngZoom(carroLatLng, DEFAULT_ZOOM));
 		} else if (id == R.id.nav_casa) {
-			map.animateCamera(CameraUpdateFactory.newLatLngZoom(casaLatLng, DEFAULT_ZOOM));
+			if (factory.getCasa() == null) {
+				codigoSelecionado = CODIGO_MARKER_CASA;
+			} else {
+				map.animateCamera(CameraUpdateFactory.newLatLngZoom(factory.getCasa().getLatLng(), DEFAULT_ZOOM));
+			}
 		} else if (id == R.id.nav_trabalho) {
-			map.animateCamera(CameraUpdateFactory.newLatLngZoom(trabalhoLatLng, DEFAULT_ZOOM));
+			if (factory.getTrabalho() == null) {
+				codigoSelecionado = CODIGO_MARKER_TRABALHO;
+			} else {
+				map.animateCamera(CameraUpdateFactory.newLatLngZoom(factory.getTrabalho().getLatLng(), DEFAULT_ZOOM));
+			}
 		}
-		DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+		DrawerLayout drawer = findViewById(R.id.drawer_layout);
 		drawer.closeDrawer(GravityCompat.START);
 		return true;
 	}
@@ -183,23 +203,59 @@ public class MainActivity extends AppCompatActivity
 	@Override
 	public void onMapReady(GoogleMap googleMap) {
 		map = googleMap;
-		map.addMarker(new MarkerOptions().position(carroLatLng).icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_carro_marker)));
-		map.addMarker(new MarkerOptions().position(casaLatLng).icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_home_marker)));
-		map.addMarker(new MarkerOptions().position(trabalhoLatLng).icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_trabalho_marker)));
-		LatLngBounds.Builder builder = new LatLngBounds.Builder();
-		builder.include(carroLatLng);
-		builder.include(casaLatLng);
-		builder.include(trabalhoLatLng);
-		map.addCircle(new CircleOptions().center(carroLatLng).radius(100).fillColor(Color.GREEN));
-		map.addCircle(new CircleOptions().center(casaLatLng).radius(100).fillColor(Color.RED));
-		map.addCircle(new CircleOptions().center(trabalhoLatLng).radius(100).fillColor(Color.BLACK));
-		int width = getResources().getDisplayMetrics().widthPixels;
-		int height = getResources().getDisplayMetrics().heightPixels;
-		int padding = (int) (width * 0.10);
-		CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngBounds(builder.build(), width, height, padding);
-		map.animateCamera(cameraUpdate);
+//		map.addMarker(new MarkerOptions().position(carroLatLng).icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_carro_marker)));
+//		LatLngBounds.Builder builder = new LatLngBounds.Builder();
+//		builder.include(carroLatLng);
+//		map.addCircle(new CircleOptions().center(carroLatLng).radius(100).fillColor(Color.GREEN));
+//		int width = getResources().getDisplayMetrics().widthPixels;
+//		int height = getResources().getDisplayMetrics().heightPixels;
+//		int padding = (int) (width * 0.10);
+//		CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngBounds(builder.build(), width, height, padding);
+//		map.animateCamera(cameraUpdate);
+		map.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
+			@Override
+			public void onMapLongClick(LatLng latLng) {
+				MapMarker mapMarker = factory.getMapMarker(codigoSelecionado, latLng);
+				if (mapMarker != null) {
+					map.addMarker(mapMarker.getMarkerOptions());
+					map.addCircle(mapMarker.getCircleOptions());
+					addLocationAlert(mapMarker);
+				}
+				codigoSelecionado = 0;
+			}
+		});
 	}
 
+	@SuppressLint ("MissingPermission")
+	private void addLocationAlert(MapMarker mapMarker) {
+		Geofence geofence = mapMarker.getGeofence();
+		mGeofencingClient.addGeofences(getGeofencingRequest(geofence), getGeofencePendingIntent()).addOnSuccessListener(new OnSuccessListener<Void>() {
+			@Override
+			public void onSuccess(Void aVoid) {
+				Toast.makeText(MainActivity.this, "Adicionou cerca", Toast.LENGTH_LONG).show();
+			}
+		})
+				.addOnFailureListener(new OnFailureListener() {
+					@Override
+					public void onFailure(@NonNull Exception e) {
+						Toast.makeText(MainActivity.this, "Falha ao adicionar cerca", Toast.LENGTH_LONG).show();
+					}
+				});
+	}
+
+	private GeofencingRequest getGeofencingRequest(Geofence geofence) {
+		GeofencingRequest.Builder builder = new GeofencingRequest.Builder();
+		builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
+		builder.addGeofence(geofence);
+		return builder.build();
+	}
+
+	private PendingIntent getGeofencePendingIntent() {
+		Intent intent = new Intent(this, LocationAlertIntentService.class);
+		return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+	}
+
+	@SuppressLint ("MissingPermission")
 	@Override
 	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
 		if (requestCode == LOCATION_PERMISSION_CODE) {
@@ -238,8 +294,8 @@ public class MainActivity extends AppCompatActivity
 	}
 
 	/*
-	* FINGERPRINT
-	* */
+	 * FINGERPRINT
+	 * */
 	@Override
 	public void onNoFingerPrintHardwareFound() {
 
@@ -269,4 +325,5 @@ public class MainActivity extends AppCompatActivity
 	public void onFingerPrintHardwareFound() {
 
 	}
+
 }
