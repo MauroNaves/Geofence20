@@ -41,6 +41,8 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 
+import java.util.ArrayList;
+
 public class MainActivity extends AppCompatActivity
 		implements NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback, LocationListener, FingerPrintAuthCallback {
 
@@ -169,12 +171,34 @@ public class MainActivity extends AppCompatActivity
 			finish();
 			return true;
 		} else if (id == R.id.action_remove_casa) {
-//			factory.setCasa(null);
+			removerGeofence(factory.getCasa());
+			factory.setCasa(null);
+			rePopularMarkers();
 		} else if (id == R.id.action_remove_trabalho) {
-//			factory.setTrabalho(null);
+			removerGeofence(factory.getTrabalho());
+			factory.setTrabalho(null);
+			rePopularMarkers();
 		}
 
 		return super.onOptionsItemSelected(item);
+	}
+
+	private void rePopularMarkers() {
+		map.clear();
+		MapMarker casa = factory.getCasa();
+		if (casa != null) {
+			popularMarker(casa, false);
+		}
+		MapMarker trabalho = factory.getTrabalho();
+		if (trabalho != null) {
+			popularMarker(trabalho, false);
+		}
+	}
+
+	private void removerGeofence(MapMarker mapMarker) {
+		ArrayList<String> geofenceIds = new ArrayList<>();
+		geofenceIds.add(mapMarker.getKey());
+		mGeofencingClient.removeGeofences(geofenceIds);
 	}
 
 	@Override
@@ -223,23 +247,27 @@ public class MainActivity extends AppCompatActivity
 			public void onMapLongClick(LatLng latLng) {
 				MapMarker mapMarker = factory.getMapMarker(codigoSelecionado, latLng);
 				if (mapMarker != null) {
-					map.addMarker(mapMarker.getMarkerOptions());
-					map.addCircle(mapMarker.getCircleOptions());
-					addLocationAlert(mapMarker);
-					invalidateOptionsMenu();
+					popularMarker(mapMarker, true);
 				}
 				codigoSelecionado = 0;
 			}
 		});
 	}
 
+	private void popularMarker(MapMarker mapMarker, boolean inserindo) {
+		map.addMarker(mapMarker.getMarkerOptions());
+		map.addCircle(mapMarker.getCircleOptions());
+		addLocationAlert(mapMarker, inserindo);
+		invalidateOptionsMenu();
+	}
+
 	@SuppressLint ("MissingPermission")
-	private void addLocationAlert(MapMarker mapMarker) {
+	private void addLocationAlert(MapMarker mapMarker, final boolean inserindo) {
 		Geofence geofence = mapMarker.getGeofence();
 		mGeofencingClient.addGeofences(getGeofencingRequest(geofence), getGeofencePendingIntent()).addOnSuccessListener(new OnSuccessListener<Void>() {
 			@Override
 			public void onSuccess(Void aVoid) {
-				Toast.makeText(MainActivity.this, "Adicionou cerca", Toast.LENGTH_LONG).show();
+				if (inserindo) Toast.makeText(MainActivity.this, "Adicionou cerca", Toast.LENGTH_LONG).show();
 			}
 		})
 				.addOnFailureListener(new OnFailureListener() {

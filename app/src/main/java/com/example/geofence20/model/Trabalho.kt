@@ -10,7 +10,7 @@ import com.google.android.gms.maps.model.MarkerOptions
 
 class Trabalho(latLng: LatLng) : MapMarker(latLng) {
 	override fun getKey(): String {
-		return "Trabalho"
+		return "TRABALHO_GEOFENCE"
 	}
 
 	override fun getMarkerOptions(): MarkerOptions {
@@ -24,7 +24,7 @@ class Trabalho(latLng: LatLng) : MapMarker(latLng) {
 
 	override fun getGeofence(): Geofence {
 		return Geofence.Builder()
-			.setRequestId("TRABALHO_GEOFENCE")
+			.setRequestId(getKey())
 			.setCircularRegion(latLng.latitude, latLng.longitude, 100F)
 			.setExpirationDuration(Geofence.NEVER_EXPIRE)
 			.setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_DWELL or Geofence.GEOFENCE_TRANSITION_EXIT)
