@@ -156,6 +156,8 @@ public class MainActivity extends AppCompatActivity
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		getMenuInflater().inflate(R.menu.main, menu);
+		menu.findItem(R.id.action_remove_casa).setVisible(factory.getCasa() != null);
+		menu.findItem(R.id.action_remove_trabalho).setVisible(factory.getTrabalho() != null);
 		return true;
 	}
 
@@ -166,6 +168,10 @@ public class MainActivity extends AppCompatActivity
 		if (id == R.id.action_settings) {
 			finish();
 			return true;
+		} else if (id == R.id.action_remove_casa) {
+//			factory.setCasa(null);
+		} else if (id == R.id.action_remove_trabalho) {
+//			factory.setTrabalho(null);
 		}
 
 		return super.onOptionsItemSelected(item);
@@ -220,6 +226,7 @@ public class MainActivity extends AppCompatActivity
 					map.addMarker(mapMarker.getMarkerOptions());
 					map.addCircle(mapMarker.getCircleOptions());
 					addLocationAlert(mapMarker);
+					invalidateOptionsMenu();
 				}
 				codigoSelecionado = 0;
 			}
