@@ -11,7 +11,7 @@ import com.google.android.gms.maps.model.MarkerOptions
 
 class Casa(latLng: LatLng) : MapMarker(latLng) {
 	override fun getKey(): String {
-		return "CASA_GEOFENCE"
+		return "validacaoCasa"
 	}
 
 	override fun getMarkerOptions(): MarkerOptions {
