@@ -34,7 +34,6 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
-import com.google.firebase.FirebaseApp
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.app_bar_main.*
@@ -115,13 +114,15 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 			locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 10f, this)
 		}
 
+		initFingerPrint()
+
+		mGeofencingClient = LocationServices.getGeofencingClient(this)
+	}
+
+	private fun initFingerPrint() {
 		if (FingerPrintUtils.isSupportedHardware(applicationContext)) {
 			mFingerPrintAuthHelper = FingerPrintAuthHelper.getHelper(applicationContext, this)
 		}
-
-		mGeofencingClient = LocationServices.getGeofencingClient(this)
-		val db = FirebaseDatabase.getInstance().reference
-		db.child("casaDigital").setValue(10)
 	}
 
 	private fun configurarDrawerLayout() {
@@ -356,7 +357,10 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 	}
 
 	override fun onAuthSuccess(cryptoObject: FingerprintManager.CryptoObject) {
-		Toast.makeText(this, "Digital", Toast.LENGTH_LONG).show()
+		val db = FirebaseDatabase.getInstance().reference
+		db.child("casaDigital").setValue(1)
+		Toast.makeText(this, "Abriu a porta", Toast.LENGTH_LONG).show()
+		mFingerPrintAuthHelper?.startAuth()
 	}
 
 	override fun onAuthFailed(errorCode: Int, errorMessage: String) {
