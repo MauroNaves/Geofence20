@@ -34,7 +34,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name=".MainActivity$LocationAlertIntentService" />
+        <service android:name=".LocationAlertIntentService" />
     </application>
 
 </manifest>
