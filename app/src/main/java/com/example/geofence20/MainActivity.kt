@@ -359,7 +359,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 			location.longitude
 		)
 		map?.let {
-			if (firstLocation) {
+			if (firstLocation || carroPareado) {
 				it.moveCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM))
 				firstLocation = false
 			}
