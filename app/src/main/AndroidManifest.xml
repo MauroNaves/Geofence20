@@ -35,6 +35,8 @@
             </intent-filter>
         </activity>
         <service android:name=".LocationAlertIntentService" />
+
+	    <uses-library android:name="org.apache.http.legacy" android:required="false" />
     </application>
 
 </manifest>

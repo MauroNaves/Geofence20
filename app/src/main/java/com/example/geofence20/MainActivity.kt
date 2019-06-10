@@ -18,6 +18,7 @@ import android.os.Bundle
 import android.support.design.widget.NavigationView
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
+import android.support.v4.content.LocalBroadcastManager
 import android.support.v4.view.GravityCompat
 import android.support.v7.app.ActionBarDrawerToggle
 import android.support.v7.app.AppCompatActivity
@@ -52,6 +53,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 		private val CODIGO_MARKER_CASA = 1
 		private val CODIGO_MARKER_TRABALHO = 2
 		private val DEFAULT_ZOOM = 15f
+		val FILTRO_KEY = "ServiceTest_KEY"
+		val MENSAGEM_KEY = "ServiceTest_MENSAGEM_KEY"
 	}
 
 	private val LOCATION_PERMISSION_CODE = 1
@@ -60,11 +63,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 	private var map: GoogleMap? = null
 	private var locationManager: LocationManager? = null
 	private var myLocation: LatLng? = null
+	private var firstLocation = true
 	private var carroLocation: LatLng? = null
 	private var mFingerPrintAuthHelper: FingerPrintAuthHelper? = null
 	private var mGeofencingClient: GeofencingClient? = null
 	private var factory: MapMarkerFactory? = null
 	private var carroPareado: Boolean = false
+	private var broadcast: LocalBroadcastServiceTest? = null
 
 	private val geofencePendingIntent: PendingIntent
 		get() {
@@ -105,7 +110,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 				)
 			}
 		} else {
-			locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 10f, this)
+			locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0f, this)
 		}
 
 		initFingerPrint()
@@ -113,6 +118,10 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 		registerReceiver()
 
 		mGeofencingClient = LocationServices.getGeofencingClient(this)
+
+		broadcast = LocalBroadcastServiceTest()
+        val intentFilter = IntentFilter(FILTRO_KEY)
+        LocalBroadcastManager.getInstance(this).registerReceiver(broadcast!!, intentFilter)
 	}
 
 	private fun registerReceiver() {
@@ -153,6 +162,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 	override fun onDestroy() {
 		super.onDestroy()
 		unregisterReceiver(mReceiver)
+		LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcast!!)
+		locationManager?.removeUpdates(this)
 	}
 
 	override fun onBackPressed() {
@@ -285,8 +296,11 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 		if (!carroPareado) {
 			return
 		}
+		if (carroLocation == null) {
+			return
+		}
 		map?.addMarker(
-			MarkerOptions().position(myLocation!!).icon(
+			MarkerOptions().position(carroLocation!!).icon(
 				BitmapDescriptorFactory.fromResource(
 					R.drawable.ic_carro_marker
 				)
@@ -331,8 +345,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 			if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 				locationManager!!.requestLocationUpdates(
 					LocationManager.GPS_PROVIDER,
-					1000,
-					10f,
+					0,
+					0f,
 					this
 				)
 			}
@@ -345,7 +359,10 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 			location.longitude
 		)
 		map?.let {
-			it.moveCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM))
+			if (firstLocation) {
+				it.moveCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM))
+				firstLocation = false
+			}
 			if (ActivityCompat.checkSelfPermission(
 					this,
 					Manifest.permission.ACCESS_FINE_LOCATION
@@ -395,15 +412,15 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 	}
 
 	override fun onAuthSuccess(cryptoObject: FingerprintManager.CryptoObject) {
-//		val casa = factory?.casa
-//		if (casa != null && (casa as Casa).dentroCerca) {
+		val casa = factory?.casa
+		if (casa != null && (casa as Casa).dentroCerca) {
 			val db = FirebaseDatabase.getInstance().reference
 			db.child("casaDigital").setValue(1)
 			Toast.makeText(this, "Abriu a porta", Toast.LENGTH_LONG).show()
-			mFingerPrintAuthHelper?.startAuth()
-//		} else {
-//			Toast.makeText(this, "É necessário estár dentro da cerca da casa.", Toast.LENGTH_LONG).show()
-//		}
+		} else {
+			Toast.makeText(this, "É necessário estár dentro da cerca da casa.", Toast.LENGTH_LONG).show()
+		}
+		mFingerPrintAuthHelper?.startAuth()
 	}
 
 	override fun onAuthFailed(errorCode: Int, errorMessage: String) {
@@ -433,6 +450,16 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 						carroPareado = false
 					}
 				}
+			}
+		}
+	}
+
+	inner class LocalBroadcastServiceTest : BroadcastReceiver() {
+
+		override fun onReceive(context: Context, intent: Intent) {
+			val status = intent.getBooleanExtra(MENSAGEM_KEY, false)
+			factory?.casa?.let {
+				(it as Casa).dentroCerca = status
 			}
 		}
 	}

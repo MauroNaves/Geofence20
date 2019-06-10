@@ -8,6 +8,9 @@ import android.widget.Toast
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 import com.google.firebase.database.FirebaseDatabase
+import android.support.v4.content.LocalBroadcastManager
+
+
 
 class LocationAlertIntentService : IntentService(IDENTIFIER) {
 
@@ -33,6 +36,12 @@ class LocationAlertIntentService : IntentService(IDENTIFIER) {
 		if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER || geofenceTransition == Geofence.GEOFENCE_TRANSITION_DWELL) {
 			db.child(requestId).setValue(1)
 			Toast.makeText(applicationContext, "Entrou na cerca", Toast.LENGTH_LONG).show()
+			if (requestId == "validacaoCasa") {
+				db.child("casaDigital").setValue(0)
+				val msg = Intent(MainActivity.FILTRO_KEY)
+				msg.putExtra(MainActivity.MENSAGEM_KEY, true)
+				LocalBroadcastManager.getInstance(this).sendBroadcast(msg)
+			}
 		} else if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
 			db.child(requestId).setValue(0)
 			Toast.makeText(applicationContext, "Saiu da cerca", Toast.LENGTH_LONG).show()
