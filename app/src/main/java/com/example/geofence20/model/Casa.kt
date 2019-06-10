@@ -10,6 +10,9 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 
 class Casa(latLng: LatLng) : MapMarker(latLng) {
+
+	var dentroCerca = false
+
 	override fun getKey(): String {
 		return "validacaoCasa"
 	}

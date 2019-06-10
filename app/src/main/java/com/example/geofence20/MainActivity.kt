@@ -2,9 +2,13 @@ package com.example.geofence20
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.IntentService
 import android.app.PendingIntent
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.hardware.fingerprint.FingerprintManager
 import android.location.Location
@@ -14,9 +18,11 @@ import android.os.Bundle
 import android.support.design.widget.NavigationView
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
+import android.support.v4.content.LocalBroadcastManager
 import android.support.v4.view.GravityCompat
 import android.support.v7.app.ActionBarDrawerToggle
 import android.support.v7.app.AppCompatActivity
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
@@ -24,16 +30,16 @@ import com.appolica.interactiveinfowindow.fragment.MapInfoWindowFragment
 import com.example.geofence20.fingerprint.FingerPrintAuthCallback
 import com.example.geofence20.fingerprint.FingerPrintAuthHelper
 import com.example.geofence20.fingerprint.FingerPrintUtils
+import com.example.geofence20.model.Casa
 import com.example.geofence20.model.MapMarker
 import com.example.geofence20.model.MapMarkerFactory
-import com.google.android.gms.location.Geofence
-import com.google.android.gms.location.GeofencingClient
-import com.google.android.gms.location.GeofencingRequest
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MarkerOptions
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.app_bar_main.*
@@ -47,6 +53,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 		private val CODIGO_MARKER_CASA = 1
 		private val CODIGO_MARKER_TRABALHO = 2
 		private val DEFAULT_ZOOM = 15f
+		val FILTRO_KEY = "ServiceTest_KEY"
+		val MENSAGEM_KEY = "ServiceTest_MENSAGEM_KEY"
 	}
 
 	private val LOCATION_PERMISSION_CODE = 1
@@ -55,9 +63,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 	private var map: GoogleMap? = null
 	private var locationManager: LocationManager? = null
 	private var myLocation: LatLng? = null
+	private var firstLocation = true
+	private var carroLocation: LatLng? = null
 	private var mFingerPrintAuthHelper: FingerPrintAuthHelper? = null
 	private var mGeofencingClient: GeofencingClient? = null
 	private var factory: MapMarkerFactory? = null
+	private var carroPareado: Boolean = false
+	private var broadcast: LocalBroadcastServiceTest? = null
 
 	private val geofencePendingIntent: PendingIntent
 		get() {
@@ -84,39 +96,37 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 				Manifest.permission.ACCESS_FINE_LOCATION
 			) != PackageManager.PERMISSION_GRANTED
 		) {
-
-			// Should we show an explanation?
 			if (ActivityCompat.shouldShowRequestPermissionRationale(
 					this,
 					Manifest.permission.ACCESS_FINE_LOCATION
 				)
 			) {
 
-				// Show an expanation to the user *asynchronously* -- don't block
-				// this thread waiting for the user's response! After the user
-				// sees the explanation, try again to request the permission.
-
 			} else {
-
-				// No explanation needed, we can request the permission.
-
 				ActivityCompat.requestPermissions(
 					this,
 					arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
 					LOCATION_PERMISSION_CODE
 				)
-
-				// MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
-				// app-defined int constant. The callback method gets the
-				// result of the request.
 			}
 		} else {
-			locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 10f, this)
+			locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0f, this)
 		}
 
 		initFingerPrint()
 
+		registerReceiver()
+
 		mGeofencingClient = LocationServices.getGeofencingClient(this)
+
+		broadcast = LocalBroadcastServiceTest()
+        val intentFilter = IntentFilter(FILTRO_KEY)
+        LocalBroadcastManager.getInstance(this).registerReceiver(broadcast!!, intentFilter)
+	}
+
+	private fun registerReceiver() {
+		val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+		registerReceiver(mReceiver, filter)
 	}
 
 	private fun initFingerPrint() {
@@ -147,6 +157,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 	override fun onPause() {
 		super.onPause()
 		mFingerPrintAuthHelper?.stopAuth()
+	}
+
+	override fun onDestroy() {
+		super.onDestroy()
+		unregisterReceiver(mReceiver)
+		LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcast!!)
+		locationManager?.removeUpdates(this)
 	}
 
 	override fun onBackPressed() {
@@ -193,6 +210,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 		factory?.trabalho?.let {
 			popularMarker(it, false)
 		}
+		desenharCarro()
 	}
 
 	private fun removerGeofence(mapMarker: MapMarker?) {
@@ -205,17 +223,28 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
 	override fun onNavigationItemSelected(item: MenuItem): Boolean {
 		when (item.itemId) {
-			R.id.nav_home -> if (myLocation != null) {
-				map?.animateCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM))
-			}
-			R.id.nav_localiza -> {
-				//			map.animateCamera(CameraUpdateFactory.newLatLngZoom(carroLatLng, DEFAULT_ZOOM));
-			}
+			R.id.nav_home -> centralizarLocalizacaoAtual()
+			R.id.nav_localiza -> localizarCarro()
 			R.id.nav_casa -> casaAction()
 			R.id.nav_trabalho -> trabalhoAction()
 		}
 		drawer_layout.closeDrawer(GravityCompat.START)
 		return true
+	}
+
+	private fun centralizarLocalizacaoAtual() {
+		if (myLocation != null)
+			map?.animateCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM))
+	}
+
+	private fun localizarCarro() {
+		if (carroLocation != null)
+			map?.animateCamera(
+				CameraUpdateFactory.newLatLngZoom(
+					carroLocation,
+					DEFAULT_ZOOM
+				)
+			)
 	}
 
 	private fun trabalhoAction() {
@@ -263,6 +292,22 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 		}
 	}
 
+	private fun desenharCarro() {
+		if (!carroPareado) {
+			return
+		}
+		if (carroLocation == null) {
+			return
+		}
+		map?.addMarker(
+			MarkerOptions().position(carroLocation!!).icon(
+				BitmapDescriptorFactory.fromResource(
+					R.drawable.ic_carro_marker
+				)
+			)
+		)
+	}
+
 	@SuppressLint("MissingPermission")
 	private fun addLocationAlert(mapMarker: MapMarker, inserindo: Boolean) {
 		val geofence = mapMarker.getGeofence()
@@ -300,8 +345,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 			if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 				locationManager!!.requestLocationUpdates(
 					LocationManager.GPS_PROVIDER,
-					1000,
-					10f,
+					0,
+					0f,
 					this
 				)
 			}
@@ -314,7 +359,10 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 			location.longitude
 		)
 		map?.let {
-			it.moveCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM))
+			if (firstLocation) {
+				it.moveCamera(CameraUpdateFactory.newLatLngZoom(myLocation, DEFAULT_ZOOM))
+				firstLocation = false
+			}
 			if (ActivityCompat.checkSelfPermission(
 					this,
 					Manifest.permission.ACCESS_FINE_LOCATION
@@ -326,6 +374,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 				return
 			}
 			it.isMyLocationEnabled = true
+			if (carroPareado) {
+				carroLocation = LatLng(
+					location.latitude,
+					location.longitude
+				)
+				rePopularMarkers()
+			}
 		}
 	}
 
@@ -357,9 +412,14 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 	}
 
 	override fun onAuthSuccess(cryptoObject: FingerprintManager.CryptoObject) {
-		val db = FirebaseDatabase.getInstance().reference
-		db.child("casaDigital").setValue(1)
-		Toast.makeText(this, "Abriu a porta", Toast.LENGTH_LONG).show()
+		val casa = factory?.casa
+		if (casa != null && (casa as Casa).dentroCerca) {
+			val db = FirebaseDatabase.getInstance().reference
+			db.child("casaDigital").setValue(1)
+			Toast.makeText(this, "Abriu a porta", Toast.LENGTH_LONG).show()
+		} else {
+			Toast.makeText(this, "É necessário estár dentro da cerca da casa.", Toast.LENGTH_LONG).show()
+		}
 		mFingerPrintAuthHelper?.startAuth()
 	}
 
@@ -369,5 +429,38 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
 	override fun onFingerPrintHardwareFound() {
 
+	}
+
+	private val mReceiver = object : BroadcastReceiver() {
+		override fun onReceive(context: Context?, intent: Intent?) {
+			val action = intent?.action
+			if (action == BluetoothDevice.ACTION_BOND_STATE_CHANGED) {
+				val mDevice =
+					intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+				when (mDevice.bondState) {
+					BluetoothDevice.BOND_BONDED -> {
+						Log.e("BroadcastReceiver", "BONDED")
+						carroPareado = true
+					}
+					BluetoothDevice.BOND_BONDING -> {
+						Log.e("BroadcastReceiver", "BONDING")
+					}
+					BluetoothDevice.BOND_NONE -> {
+						Log.e("BroadcastReceiver", "NONE")
+						carroPareado = false
+					}
+				}
+			}
+		}
+	}
+
+	inner class LocalBroadcastServiceTest : BroadcastReceiver() {
+
+		override fun onReceive(context: Context, intent: Intent) {
+			val status = intent.getBooleanExtra(MENSAGEM_KEY, false)
+			factory?.casa?.let {
+				(it as Casa).dentroCerca = status
+			}
+		}
 	}
 }

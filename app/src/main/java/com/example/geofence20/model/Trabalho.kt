@@ -11,7 +11,7 @@ import com.google.android.gms.maps.model.MarkerOptions
 
 class Trabalho(latLng: LatLng) : MapMarker(latLng) {
 	override fun getKey(): String {
-		return "TRABALHO_GEOFENCE"
+		return "validacaoTrabalho"
 	}
 
 	override fun getMarkerOptions(): MarkerOptions {
@@ -20,7 +20,7 @@ class Trabalho(latLng: LatLng) : MapMarker(latLng) {
 	}
 
 	override fun getCircleOptions(): CircleOptions {
-		return CircleOptions().center(latLng).radius(100.0).fillColor(Color.BLACK)
+		return CircleOptions().center(latLng).radius(100.0).fillColor(Color.BLUE)
 	}
 
 	override fun getGeofence(): Geofence {
